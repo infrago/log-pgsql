@@ -89,23 +89,27 @@ func (this *pgsqlConnect) Close() error {
 	return nil
 }
 
-func (this *pgsqlConnect) Write(msg log.Log) error {
-	data := msg.Mapping()
+// Write 写日志
+func (this *pgsqlConnect) Write(msgs ...log.Log) error {
+	vals := []Any{}
 
-	vals := []Any{
-		data["time"], data["name"], data["role"],
-		data["level"], data["body"],
+	lines := []string{}
+	for i, msg := range msgs {
+		params := []string{}
+		for j := 1; j <= 5; j++ {
+			params = append(params, fmt.Sprintf("$%d", i*5+j))
+		}
+		lines = append(lines, strings.Join(params, ","))
+
+		data := msg.Mapping()
+		vals = append(vals, data["time"], data["name"], data["role"], data["level"], data["body"])
 	}
 
-	sql := fmt.Sprintf(`INSERT INTO "%s"."%s" ("time","name","role","level","body") VALUES ($1,$2,$3,$4,$5)`, this.setting.Schema, this.setting.Table)
+	sql := fmt.Sprintf(`INSERT INTO "%s"."%s" ("time","name","role","level","body") VALUES (%s)`, this.setting.Schema, this.setting.Table, strings.Join(lines, "),\n("))
 	_, err := this.db.Exec(sql, vals...)
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func (this *pgsqlConnect) Flush() {
-
 }
